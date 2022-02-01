@@ -1,0 +1,63 @@
+name:                jarvis
+version:             0.1.0.0
+github:              "gillchristian/jarvis"
+license:             MIT
+
+extra-source-files:
+- README.md
+
+# Metadata used when publishing your package
+# synopsis:            Short description of your package
+# category:            Web
+
+# To avoid duplicated efforts in documentation and dealing with the
+# complications of embedding Haddock markup inside cabal files, it is
+# common to point users to the README.md file.
+description:         Please see the README on GitHub at <https://github.com/githubuser/jarvis#readme>
+
+dependencies:
+- base >= 4.7 && < 5
+- calamity >=0.2.0 && <0.2.1
+- data-default
+- data-flags
+- di
+- di-polysemy
+- generic-lens
+- lens
+- polysemy
+- polysemy-plugin
+- text
+- text-show
+
+library:
+  source-dirs: src
+
+default-extensions:
+  - DataKinds
+  - OverloadedLabels
+  - OverloadedStrings
+  - TypeApplications
+
+executables:
+  jarvis-exe:
+    main:                Main.hs
+    source-dirs:         app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    - -fplugin=Polysemy.Plugin
+    dependencies:
+    - jarvis
+
+tests:
+  jarvis-test:
+    main:                Spec.hs
+    source-dirs:         test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    - -fplugin=Polysemy.Plugin
+    dependencies:
+    - jarvis
