@@ -31,13 +31,18 @@ library
       OverloadedLabels
       OverloadedStrings
       TypeApplications
+  ghc-options: -fplugin=Polysemy.Plugin
   build-depends:
       base >=4.7 && <5
     , calamity ==0.2.0.*
     , data-default
     , data-flags
+    , df1
     , di
+    , di-core
     , di-polysemy
+    , directory
+    , filepath
     , generic-lens
     , lens
     , polysemy
@@ -57,14 +62,18 @@ executable jarvis-exe
       OverloadedLabels
       OverloadedStrings
       TypeApplications
-  ghc-options: -threaded -rtsopts -with-rtsopts=-N -fplugin=Polysemy.Plugin
+  ghc-options: -fplugin=Polysemy.Plugin -Wall -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
     , calamity ==0.2.0.*
     , data-default
     , data-flags
+    , df1
     , di
+    , di-core
     , di-polysemy
+    , directory
+    , filepath
     , generic-lens
     , jarvis
     , lens
@@ -86,14 +95,18 @@ test-suite jarvis-test
       OverloadedLabels
       OverloadedStrings
       TypeApplications
-  ghc-options: -threaded -rtsopts -with-rtsopts=-N -fplugin=Polysemy.Plugin
+  ghc-options: -fplugin=Polysemy.Plugin -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
     , calamity ==0.2.0.*
     , data-default
     , data-flags
+    , df1
     , di
+    , di-core
     , di-polysemy
+    , directory
+    , filepath
     , generic-lens
     , jarvis
     , lens
