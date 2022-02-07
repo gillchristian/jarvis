@@ -1,0 +1,16 @@
+version: '3.2'
+
+services:
+  jarvis:
+    image: gillchristian/jarvis:latest
+    ports:
+      - "9000:${PORT}"
+    env_file:
+      - .env
+    volumes:
+      - type: bind
+        source: .jarvistoken
+        target: /root/.jarvistoken
+      - type: bind
+        source: .jarvisdata
+        target: /root/.jarvisdata

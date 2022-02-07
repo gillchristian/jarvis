@@ -1,0 +1,65 @@
+name: 'Publish to Docker'
+
+on: 
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        stack: ["2.7.3"]
+        ghc: ["8.10.7"]
+
+    steps:
+    - uses: actions/checkout@v2
+      if: github.event.action == 'opened' || github.event.action == 'synchronize' || github.event.ref == 'refs/heads/master'
+
+    - uses: haskell/actions/setup@v1.1.5
+      name: Setup Haskell Stack
+      with:
+        ghc-version: ${{ matrix.ghc }}
+        stack-version: ${{ matrix.stack }}
+
+    - uses: actions/cache@v1
+      name: Cache ~/.stack
+      with:
+        path: ~/.stack
+        key: ${{ runner.os }}-${{ matrix.ghc }}-stack
+
+    - name: Build
+      run: |
+        stack build --system-ghc --test --bench --no-run-tests --no-run-benchmarks
+        cp $(stack exec -- which jarvis-exe) jarvis-exe
+
+    - name: Get release version
+      id: get_version
+      run: echo ::set-env name=RELEASE_VERSION::$(echo ${GITHUB_REF:10})
+      env:
+        ACTIONS_ALLOW_UNSECURE_COMMANDS: true
+
+    - name: Publish to Registry
+      uses: elgohr/Publish-Docker-Github-Action@master
+      env:
+        BINARY_PATH: "jarvis-exe"
+      with:
+        name: gillchristian/jarvis
+        username: gillchristian
+        password: ${{ secrets.docker_password }}
+        tags: "latest,${{ env.RELEASE_VERSION }}"
+        buildargs: BINARY_PATH
+
+    - name: Deploy (webhook)
+      shell: bash
+      run: |
+        curl -d '{ "name": "jarvis" }' \
+          -H "Authorization: $TOKEN" \
+          -H "Content-Type: application/json" \
+          -X POST "$WEBHOOK"
+      env:
+        WEBHOOK: ${{ secrets.deploy_webhook }}
+        TOKEN: ${{ secrets.deploy_token }}
+        ACTIONS_ALLOW_UNSECURE_COMMANDS: true
