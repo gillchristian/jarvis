@@ -11,6 +11,8 @@ description:         Please see the README on GitHub at <https://github.com/gill
 dependencies:
 - base >= 4.7 && < 5
 - calamity >=0.2.0 && <0.2.1
+- aeson
+- bytestring
 - data-default
 - data-flags
 - df1
@@ -23,8 +25,12 @@ dependencies:
 - lens
 - polysemy
 - polysemy-plugin
+- raw-strings-qq
+- sqlite-simple
 - text
 - text-show
+- time
+- transformers
 
 library:
   source-dirs: src

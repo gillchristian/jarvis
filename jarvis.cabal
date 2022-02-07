@@ -21,6 +21,10 @@ source-repository head
 
 library
   exposed-modules:
+      Data.DateTime
+      Data.Text.ToText
+      Jarvis.Prelude
+      Jarvis.Query
       Lib
   other-modules:
       Paths_jarvis
@@ -33,7 +37,9 @@ library
       TypeApplications
   ghc-options: -fplugin=Polysemy.Plugin
   build-depends:
-      base >=4.7 && <5
+      aeson
+    , base >=4.7 && <5
+    , bytestring
     , calamity ==0.2.0.*
     , data-default
     , data-flags
@@ -47,8 +53,12 @@ library
     , lens
     , polysemy
     , polysemy-plugin
+    , raw-strings-qq
+    , sqlite-simple
     , text
     , text-show
+    , time
+    , transformers
   default-language: Haskell2010
 
 executable jarvis-exe
@@ -64,7 +74,9 @@ executable jarvis-exe
       TypeApplications
   ghc-options: -fplugin=Polysemy.Plugin -Wall -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      base >=4.7 && <5
+      aeson
+    , base >=4.7 && <5
+    , bytestring
     , calamity ==0.2.0.*
     , data-default
     , data-flags
@@ -79,8 +91,12 @@ executable jarvis-exe
     , lens
     , polysemy
     , polysemy-plugin
+    , raw-strings-qq
+    , sqlite-simple
     , text
     , text-show
+    , time
+    , transformers
   default-language: Haskell2010
 
 test-suite jarvis-test
@@ -97,7 +113,9 @@ test-suite jarvis-test
       TypeApplications
   ghc-options: -fplugin=Polysemy.Plugin -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      base >=4.7 && <5
+      aeson
+    , base >=4.7 && <5
+    , bytestring
     , calamity ==0.2.0.*
     , data-default
     , data-flags
@@ -112,6 +130,10 @@ test-suite jarvis-test
     , lens
     , polysemy
     , polysemy-plugin
+    , raw-strings-qq
+    , sqlite-simple
     , text
     , text-show
+    , time
+    , transformers
   default-language: Haskell2010
