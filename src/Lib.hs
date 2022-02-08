@@ -76,7 +76,8 @@ runBot = do
 
           when (not isBot && not isCommand) $ do
             note <- P.embed $ getChannelNote conn $ msg ^. #channelID
-            P.embed $ insertMsg conn $ QueuedMsg Pending (msg ^. #id) (msg ^. #channelID) note
+            vault <- P.embed $ getChannelVault conn $ msg ^. #channelID
+            P.embed $ insertMsg conn $ QueuedMsg Pending (msg ^. #id) (msg ^. #channelID) note vault
 
             void . C.invoke $ CreateReaction msg msg $ UnicodeEmoji "⌛"
 
@@ -91,9 +92,14 @@ runBot = do
             P.embed $ upsertChannelNote conn cn
             P.embed $ setNoteOnNotelessMsgs conn cn
 
-            void . C.tell @Text ctx $ "Got it, will save messages to '" <> note <> "'"
+            void . C.tell @Text ctx $ "Got it, will save messages to note: **" <> note <> "**"
 
-            void . C.invoke $ CreateReaction (ctx ^. #channel) (ctx ^. #message) (UnicodeEmoji "✅")
+          void $ Cmds.command @'[Text] "vault" $ \ctx vault -> do
+            let cn = ChannelVault (ctx ^. #message . #channelID) vault
+            P.embed $ upsertChannelVault conn cn
+            P.embed $ setVaultOnMsgs conn cn
+
+            void . C.tell @Text ctx $ "Got it, will save messages to vault: **" <> vault <> "**"
 
           void $ Cmds.command @'[] "clear-note" $ \ctx -> do
             P.embed $ clearNoteForChannel conn $ ctx ^. #message . #channelID
@@ -116,7 +122,12 @@ runBot = do
             mbNote <- P.embed $ getChannelNote conn $ ctx ^. #message . #channelID
 
             for_ mbNote $ \note ->
-              void . C.tell ctx $ "The channel note is **" <> note <> "**"
+              void . C.tell ctx $ "The channel's note is **" <> note <> "**"
+
+            mbVault <- P.embed $ getChannelVault conn $ ctx ^. #message . #channelID
+
+            for_ mbVault $ \vault ->
+              void . C.tell ctx $ "The channel's vault is **" <> vault <> "**"
 
 -- -----------------------------------------------------------------------------
 initDB :: IO Sql.Connection
@@ -125,10 +136,18 @@ initDB = do
 
   conn <- Sql.open $ home </> ".jarvisdata"
 
-  Sql.execute_ conn Q.createChannelActiveNotes
+  Sql.execute_ conn Q.createChannelActiveNoteTable
+  Sql.execute_ conn Q.createChannelActiveVaultTable
   Sql.execute_ conn Q.createMessageQueueTable
 
   pure conn
+
+upsertChannelVault :: Sql.Connection -> ChannelVault -> IO ()
+upsertChannelVault conn c@(ChannelVault chan vault) = do
+  res :: [ChannelVault] <- Sql.query conn Q.selectChannelVault $ Sql.Only $ Json.encode chan
+  case res of
+    [] -> Sql.execute conn Q.insertChannelVault c
+    _ -> Sql.execute conn Q.updateVaultForChannel (vault, Json.encode chan)
 
 upsertChannelNote :: Sql.Connection -> ChannelNote -> IO ()
 upsertChannelNote conn c@(ChannelNote chan note) = do
@@ -140,7 +159,12 @@ upsertChannelNote conn c@(ChannelNote chan note) = do
 getChannelNote :: Sql.Connection -> Snowflake Channel -> IO (Maybe Text)
 getChannelNote conn chan = do
   res :: [ChannelNote] <- Sql.query conn Q.selectChannelNote $ Sql.Only $ Json.encode chan
-  pure $ chanNote <$> listToMaybe res
+  pure $ noteName <$> listToMaybe res
+
+getChannelVault :: Sql.Connection -> Snowflake Channel -> IO (Maybe Text)
+getChannelVault conn chan = do
+  res :: [ChannelVault] <- Sql.query conn Q.selectChannelVault $ Sql.Only $ Json.encode chan
+  pure $ vaultName <$> listToMaybe res
 
 pendingMsgs :: Sql.Connection -> IO [QueuedMsg]
 pendingMsgs conn = Sql.query_ conn Q.allPendingMsgs
@@ -151,6 +175,10 @@ allChannelNotes conn = Sql.query_ conn Q.allChannelNotes
 setNoteOnNotelessMsgs :: Sql.Connection -> ChannelNote -> IO ()
 setNoteOnNotelessMsgs conn (ChannelNote chan note) =
   Sql.execute conn Q.updateNoteForMsg (note, Json.encode chan)
+
+setVaultOnMsgs :: Sql.Connection -> ChannelVault -> IO ()
+setVaultOnMsgs conn (ChannelVault chan vault) =
+  Sql.execute conn Q.updateVaultForMsgs (vault, Json.encode chan)
 
 channelStats :: Sql.Connection -> Snowflake Channel -> IO (Int, Int)
 channelStats conn chan = do
@@ -170,9 +198,27 @@ delMsg conn = Sql.execute conn Q.delMsg . Sql.Only . Json.encode
 
 -- -----------------------------------------------------------------------------
 
+data ChannelVault = ChannelVault
+  { vaultChan :: Snowflake Channel,
+    vaultName :: Text
+  }
+  deriving (Eq, Show)
+
+instance ToRow ChannelVault where
+  toRow :: ChannelVault -> [SQLData]
+  toRow (ChannelVault chan note) = toRow (Json.encode chan, note)
+
+instance FromRow ChannelVault where
+  fromRow :: RowParser ChannelVault
+  fromRow = do
+    ChannelVault
+      -- TODO: use something better than error here /shrug
+      <$> (fromMaybe (Prelude.error "Could not decode channel_id") . Json.decode <$> Sql.field)
+      <*> Sql.field
+
 data ChannelNote = ChannelNote
-  { chanChan :: Snowflake Channel,
-    chanNote :: Text
+  { noteChan :: Snowflake Channel,
+    noteName :: Text
   }
   deriving (Eq, Show)
 
@@ -215,14 +261,15 @@ data QueuedMsg = QueuedMsg
   { msgStatus :: MsgStatus,
     msgMsg :: Snowflake Message,
     msgChan :: Snowflake Channel,
-    msgNote :: Maybe Text
+    msgNote :: Maybe Text,
+    msgVault :: Maybe Text
   }
   deriving (Show, Eq)
 
 instance ToRow QueuedMsg where
   toRow :: QueuedMsg -> [SQLData]
-  toRow (QueuedMsg sts msg chan note) =
-    toRow (sts, Json.encode msg, Json.encode chan, note)
+  toRow (QueuedMsg sts msg chan note vault) =
+    toRow (sts, Json.encode msg, Json.encode chan, note, vault)
 
 instance FromRow QueuedMsg where
   fromRow :: RowParser QueuedMsg
@@ -233,4 +280,5 @@ instance FromRow QueuedMsg where
       <*> (fromMaybe (Prelude.error "Could not decode message_id") . Json.decode <$> Sql.field)
       -- TODO: use something better than error here /shrug
       <*> (fromMaybe (Prelude.error "Could not decode channel_id") . Json.decode <$> Sql.field)
+      <*> Sql.field
       <*> Sql.field
