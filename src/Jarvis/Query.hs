@@ -10,6 +10,7 @@ createChannelActiveNoteTable =
   [r|
     CREATE TABLE IF NOT EXISTS channel_active_notes (
       channel_id TEXT PRIMARY KEY NOT NULL,
+      channel_name TEXT NOT NULL,
       note_name TEXT NOT NUll
     );
   |]
@@ -19,19 +20,20 @@ createChannelActiveVaultTable =
   [r|
     CREATE TABLE IF NOT EXISTS channel_active_vault (
       channel_id TEXT PRIMARY KEY NOT NULL,
+      channel_name TEXT PRIMARY KEY NOT NULL,
       vault_name TEXT NOT NUll
     );
   |]
 
-createMessageQueueTable :: Sql.Query
-createMessageQueueTable =
+createMsgQueueTable :: Sql.Query
+createMsgQueueTable =
   [r|
     CREATE TABLE IF NOT EXISTS message_queue (
-      status TEXT NOT NULL,
       message_id TEXT PRIMARY KEY NOT NULL,
-      channel_id TEXT NOT NULL,
-      note_name TEXT,
-      vault_name TEXT
+      content TEXT NOT NULL,
+      note_name TEXT NOT NULL,
+      vault_name TEXT,
+      mode TEXT NOT NULL
     );
   |]
 
@@ -39,32 +41,32 @@ insertMsg :: Sql.Query
 insertMsg =
   [r|
     INSERT INTO message_queue
-    (status, message_id, channel_id, note_name, vault_name)
+    (message_id, content, note_name, vault_name, mode)
     VALUES (?,?,?,?,?);
   |]
 
-allPendingMsgs :: Sql.Query
-allPendingMsgs =
+getMsg :: Sql.Query
+getMsg =
   [r|
-    SELECT status, message_id, channel_id, note_name, vault_name
+    SELECT message_id, content, note_name, vault_name, mode
     FROM message_queue
-    WHERE status = "pending";
+    WHERE message_id = ?;
   |]
 
 insertChannelNote :: Sql.Query
 insertChannelNote =
   [r|
     INSERT INTO channel_active_notes
-    (channel_id, note_name)
-    VALUES (?,?);
+    (channel_id, channel_name, note_name)
+    VALUES (?,?,?);
   |]
 
 insertChannelVault :: Sql.Query
 insertChannelVault =
   [r|
     INSERT INTO channel_active_vault
-    (channel_id, vault_name)
-    VALUES (?,?);
+    (channel_id, channel_name, vault_name)
+    VALUES (?,?,?);
   |]
 
 updateNoteForChannel :: Sql.Query
@@ -83,26 +85,10 @@ updateVaultForChannel =
     WHERE channel_id = ?;
   |]
 
-updateNoteForMsg :: Sql.Query
-updateNoteForMsg =
-  [r|
-    UPDATE message_queue
-    SET note_name = ?
-    WHERE channel_id = ? AND note_name IS NULL;
-  |]
-
-updateVaultForMsgs :: Sql.Query
-updateVaultForMsgs =
-  [r|
-    UPDATE message_queue
-    SET vault_name = ?
-    WHERE channel_id = ? AND vault_name IS NULL;
-  |]
-
 selectChannelNote :: Sql.Query
 selectChannelNote =
   [r|
-    SELECT channel_id, note_name
+    SELECT channel_id, channel_name, note_name
     FROM channel_active_notes
     WHERE channel_id = ?;
   |]
@@ -110,16 +96,9 @@ selectChannelNote =
 selectChannelVault :: Sql.Query
 selectChannelVault =
   [r|
-    SELECT channel_id, vault_name
+    SELECT channel_id, channel_name, vault_name
     FROM channel_active_vault
     WHERE channel_id = ?;
-  |]
-
-allChannelNotes :: Sql.Query
-allChannelNotes =
-  [r|
-    SELECT channel_id, note_name
-    FROM channel_active_notes;
   |]
 
 delMsg :: Sql.Query
@@ -132,16 +111,21 @@ delMsg =
 channelStats :: Sql.Query
 channelStats =
   [r|
-    SELECT
-      SUM(status = 'pending') AS pending,
-      SUM(note_name IS NULL) AS noteless_msgs
+    SELECT vault_name, note_name, COUNT(*)
     FROM message_queue
-    WHERE channel_id = ?;
+    GROUP BY vault_name, note_name;
   |]
 
 delNoteOfChannel :: Sql.Query
 delNoteOfChannel =
   [r|
     DELETE FROM channel_active_notes
+    WHERE channel_id = ?;
+  |]
+
+delVaultOfChannel :: Sql.Query
+delVaultOfChannel =
+  [r|
+    DELETE FROM channel_active_vault
     WHERE channel_id = ?;
   |]
